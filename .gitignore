@@ -7,7 +7,6 @@
 
 # Build outputs
 build/
-dist/
 oss-cli
 oss-server
 

@@ -11,11 +11,13 @@ import (
 )
 
 var cfgFile string
+var appVersion = "V1.0.1"
 
 // rootCmd 是整个 CLI 应用程序的基础命令
 var rootCmd = &cobra.Command{
-	Use:   "oss-cli",
-	Short: "A CLI tool and API server for Aliyun OSS",
+	Use:     "oss-cli",
+	Short:   "A CLI tool and API server for Aliyun OSS",
+	Version: appVersion,
 }
 
 // Execute 是整个命令行工具的入口函数
