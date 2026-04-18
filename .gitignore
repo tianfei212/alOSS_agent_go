@@ -1,0 +1,22 @@
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets and local env
+.env.local
+
+# Build outputs
+build/
+dist/
+oss-cli
+oss-server
+
+# Runtime data
+blacklist.txt
+.blackIP.json
+
+# Large local test assets
+test_file/
+
+# Temp helpers
+patcher.py

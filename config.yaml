@@ -1,0 +1,9 @@
+oss:
+  endpoint: "oss-cn-hangzhou.aliyuncs.com"
+  access_key_id: "your_access_key_id"
+  access_key_secret: "your_access_key_secret"
+  bucket_name: "your-bucket-name"
+
+server:
+  port: 8080
+  link_expire_seconds: 3600
