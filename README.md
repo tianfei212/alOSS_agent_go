@@ -123,9 +123,7 @@ go build -o oss-cli .
 `start.sh` 会根据当前系统和 CPU 自动选择：
 
 - macOS Apple Silicon: `dist/oss-cli-darwin-arm64`
-- macOS Intel: `dist/oss-cli-darwin-amd64`
 - Ubuntu amd64: `dist/oss-cli-linux-amd64`
-- Ubuntu arm64: `dist/oss-cli-linux-arm64`
 
 ### 鉴权
 
@@ -248,15 +246,12 @@ chmod +x build.sh
 输出目录为 `dist/`，包含：
 
 - `oss-cli-darwin-arm64`
-- `oss-cli-darwin-amd64`
 - `oss-cli-linux-amd64`
-- `oss-cli-linux-arm64`
 
 说明：
 
 - Mac M1 / M2 / M3 / M4 / M5 都使用 `darwin-arm64`
 - Ubuntu 常见服务器使用 `linux-amd64`
-- ARM 云主机可使用 `linux-arm64`
 
 ## GitHub Release 安装
 

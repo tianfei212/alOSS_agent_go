@@ -25,7 +25,10 @@ if [ ! -f "${BIN_FILE}" ]; then
 fi
 
 if [ ! -f "${BIN_FILE}" ]; then
-  echo "错误：仍未找到可执行文件 ${BIN_FILE}"
+  echo "错误：当前仅提供以下构建目标："
+  echo "  - macOS arm64 (M1-M5): dist/${APP_NAME}-darwin-arm64"
+  echo "  - Linux amd64 (Ubuntu): dist/${APP_NAME}-linux-amd64"
+  echo "当前系统不在支持范围内：${OS_TYPE}/${ARCH_TYPE}"
   exit 1
 fi
 

@@ -6,9 +6,7 @@ APP_NAME="oss-cli"
 OUTPUT_DIR="dist"
 TARGETS=(
   "darwin arm64"
-  "darwin amd64"
   "linux amd64"
-  "linux arm64"
 )
 
 echo "开始编译 ${APP_NAME} 跨平台版本..."
