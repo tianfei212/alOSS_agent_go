@@ -7,43 +7,45 @@ CONFIG_FILE="config.yaml"
 OUTPUT_DIR="dist"
 PORT="${1:-8080}"
 
+if [ ! -f "${CONFIG_FILE}" ]; then
+  echo "错误: 未找到 ${CONFIG_FILE}"
+  echo "提示: 首次使用请先解压发布包，或复制 config.yaml 和 .env.example 到当前目录"
+  exit 1
+fi
+
+if [ ! -f .env.example ] && [ -f config.yaml ]; then
+  echo "提示: 建议创建 .env.example（参考配置）以了解环境变量用法"
+fi
+
 OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH_TYPE=$(uname -m)
 
 case "${ARCH_TYPE}" in
-  x86_64) ARCH_TYPE="amd64" ;;
+  x86_64)  ARCH_TYPE="amd64" ;;
   arm64|aarch64) ARCH_TYPE="arm64" ;;
 esac
 
 BIN_FILE="${OUTPUT_DIR}/${APP_NAME}-${OS_TYPE}-${ARCH_TYPE}"
 
 if [ ! -f "${BIN_FILE}" ]; then
-  echo "未找到当前系统对应的二进制: ${BIN_FILE}"
-  echo "开始自动编译..."
-  chmod +x build.sh
-  ./build.sh
-fi
-
-if [ ! -f "${BIN_FILE}" ]; then
-  echo "错误：当前仅提供以下构建目标："
-  echo "  - macOS arm64 (M1-M5): dist/${APP_NAME}-darwin-arm64"
-  echo "  - Linux amd64 (Ubuntu): dist/${APP_NAME}-linux-amd64"
-  echo "当前系统不在支持范围内：${OS_TYPE}/${ARCH_TYPE}"
+  echo "错误: 未找到当前系统对应的二进制: ${BIN_FILE}"
+  echo "支持的构建目标:"
+  echo "  - macOS ARM64 (Apple Silicon): ${APP_NAME}-darwin-arm64"
+  echo "  - Linux AMD64 (Ubuntu):        ${APP_NAME}-linux-amd64"
+  echo ""
+  echo "请从 release 包中解压对应平台的二进制到 ${OUTPUT_DIR}/"
   exit 1
-fi
-
-if [ ! -f "${CONFIG_FILE}" ]; then
-  echo "警告：未找到 ${CONFIG_FILE}，程序仍会尝试读取 .env.local"
 fi
 
 chmod +x "${BIN_FILE}"
 
-echo "=========================================================="
-echo "准备启动 ${APP_NAME} Server"
-echo "系统类型: ${OS_TYPE}"
-echo "CPU 架构: ${ARCH_TYPE}"
-echo "二进制: ${BIN_FILE}"
-echo "端口: ${PORT}"
-echo "=========================================================="
+echo "=========================================="
+echo "  ${APP_NAME} Server 启动"
+echo "=========================================="
+echo "  系统:   ${OS_TYPE}/${ARCH_TYPE}"
+echo "  二进制: ${BIN_FILE}"
+echo "  端口:   ${PORT}"
+echo "  配置:   ${CONFIG_FILE}"
+echo "=========================================="
 
 exec "./${BIN_FILE}" server -p "${PORT}"

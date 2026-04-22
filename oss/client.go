@@ -148,7 +148,7 @@ func (c *Client) UploadFile(localFilePath string, objectKey string) error {
 		objectKey:   finalKey,
 		totalSize:   fileSize,
 		uploadStart: time.Now(),
-		stopChan:   make(chan struct{}),
+		stopChan:    make(chan struct{}),
 	}
 	progressReader.startLogging()
 
@@ -183,7 +183,7 @@ func (c *Client) UploadStream(reader io.Reader, objectKey string) error {
 		reader:      reader,
 		objectKey:   finalKey,
 		uploadStart: time.Now(),
-		stopChan:   make(chan struct{}),
+		stopChan:    make(chan struct{}),
 	}
 	progressReader.startLogging()
 
@@ -244,6 +244,23 @@ func (c *Client) GetSignedURL(objectKey string, expiredInSec int) (string, error
 	}
 
 	log.Printf("[INFO] 签名 URL 生成成功")
+	return signedURL, nil
+}
+
+// GetThumbnailSignedURL 生成带有有效期的缩略图临时访问链接
+// width 参数指定缩略图宽度（单位：像素），高度按原图比例自动计算
+func (c *Client) GetThumbnailSignedURL(objectKey string, width int, height int, expiredInSec int) (string, error) {
+	finalKey := c.resolveKey(objectKey)
+	log.Printf("[INFO] 生成缩略图签名 URL，文件: %s，宽度: %dpx，高度: %dpx，有效期: %d 秒", finalKey, width, height, expiredInSec)
+
+	process := fmt.Sprintf("image/resize,w_%d,h_%d,m_fill", width, height)
+	signedURL, err := c.Bucket.SignURL(finalKey, oss.HTTPGet, int64(expiredInSec), oss.Process(process))
+	if err != nil {
+		log.Printf("[ERROR] 生成缩略图签名 URL 失败 (key: %s, width: %d, height: %d): %v\n", finalKey, width, height, err)
+		return "", fmt.Errorf("生成缩略图签名 URL 失败: %w", err)
+	}
+
+	log.Printf("[INFO] 缩略图签名 URL 生成成功")
 	return signedURL, nil
 }
 
