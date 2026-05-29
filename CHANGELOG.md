@@ -1,3 +1,54 @@
+2026-05-29 23:40:00 +0800
+
+修改模型：GPT-5.5（Cursor Agent 模式，005-go-backend-expert + 012-code-reviewer）
+
+修改目的：版本升级至 **V1.0.5**。为 OSS 对象引入保存周期（Tag + Lifecycle 自动删除）：配置默认 2 年、上传可指定 `retention_years` / `retention_days`、存量脚本批量打 3 年 tag；删除由 OSS Lifecycle Expiration 执行，应用侧无 cleanup。
+
+**问题**：Bucket 未配置 Lifecycle，1000+ 对象永久保留；上传无法按文件指定保留年限。
+
+**方案**：
+- `config.yaml` 可选 `default_retention_years`（默认 2）、`allowed_retention_years`、`allowed_retention_days`（测试最短 1 天，OSS 不支持分钟/小时级）
+- 上传时写入对象 Tag `retention-years` / `retention-days`，Bucket Lifecycle 按 Prefix+Tag 匹配 Expiration Days
+- `POST /v1/files` 支持 `retention_years`、`retention_days`；响应含 `retention_until`
+- CLI `upload --retention-years` / `--retention-days`
+- 运维脚本：`sync-lifecycle-rules.sh`（Get→merge→Put 规则）、`set-default-retention.sh`（存量 PutObjectTagging，默认 3 年）
+- `scripts/oss-inventory/` 输出含 tag 与预计删除时间的 Markdown 报告
+
+**存量迁移（2026-05-29）**：1068 个对象已打 tag `retention-years=3`；Lifecycle 规则 2/3/5/10 年 + 1 天已同步。
+
+**联调测试文件（retention_days=1）**：
+- HTTP：`test-retention-http-20260529_233447.png`（`POST /v1/files` + `retention_days=1`）
+- CLI：`file-4ac5a752-12c6-47b0-802f-035a8e05ed05-test-retention-cli-20260529_233447.png`（`oss-cli upload --retention-days 1`）
+
+改动文件：
+
+- VERSION
+- cmd/root.go
+- cmd/upload.go
+- config/config.go
+- config/retention.go（新建）
+- config/retention_test.go（新建）
+- config.yaml.example
+- oss/client.go
+- oss/retention.go（新建）
+- oss/lifecycle.go（新建）
+- oss/retention_test.go（新建）
+- server/server.go
+- scripts/sync-lifecycle/（新建）
+- scripts/sync-lifecycle-rules.sh（新建）
+- scripts/set-retention/（新建）
+- scripts/set-default-retention.sh（新建）
+- scripts/oss-inventory/（新建）
+- docs/PRD-RETENTION-PERIOD.md（新建）
+- docs/PLAN-RETENTION-PERIOD.md（新建）
+- docs/ARCHITECT-DESIGN-RETENTION-PERIOD.md（新建）
+- docs/OSS-RETENTION-REPORT-20260529.md（新建）
+- release-build.sh
+- README.md
+- CHANGELOG.md
+
+---
+
 2026-05-29 23:30:00 +0800
 
 修改模型：GPT-5.5（Cursor Agent 模式，012-code-reviewer）

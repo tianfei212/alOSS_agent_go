@@ -111,6 +111,13 @@ func uploadFile(c *gin.Context) {
 		purpose = "fine-tune" // default or mock
 	}
 
+	retention, err := parseRetentionPolicy(c)
+	if err != nil {
+		log.Printf("[WARN] retention 参数无效: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	var src io.ReadCloser
 	var filename string
 	var fileSize int64
@@ -156,8 +163,8 @@ func uploadFile(c *gin.Context) {
 	objectKey := filename
 
 	ossClient := oss.GetInstance()
-	log.Printf("[INFO] 开始流式上传至 OSS，键名: %s", objectKey)
-	if err := ossClient.UploadStream(src, objectKey); err != nil {
+	log.Printf("[INFO] 开始流式上传至 OSS，键名: %s，保存周期: %s", objectKey, retention.String())
+	if err := ossClient.UploadStream(src, objectKey, retention); err != nil {
 		log.Printf("[ERROR] 上传至 OSS 失败: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -176,15 +183,55 @@ func uploadFile(c *gin.Context) {
 	}
 
 	log.Printf("[INFO] 文件上传处理完成，返回文件信息")
-	c.JSON(http.StatusOK, gin.H{
-		"id":         objectKey, // use objectKey as ID to simplify
-		"object":     "file",
-		"bytes":      fileSize,
-		"created_at": time.Now().Unix(),
-		"filename":   filename,
-		"purpose":    purpose,
-		"view_url":   signedURL,
-	})
+	uploadTime := time.Now().UTC()
+	resp := gin.H{
+		"id":              objectKey,
+		"object":          "file",
+		"bytes":           fileSize,
+		"created_at":      uploadTime.Unix(),
+		"filename":        filename,
+		"purpose":         purpose,
+		"retention_until": retention.Until(uploadTime).Format(time.RFC3339),
+		"view_url":        signedURL,
+	}
+	if retention.Unit == oss.RetentionUnitDays {
+		resp["retention_days"] = retention.Value
+	} else {
+		resp["retention_years"] = retention.Value
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func parseRetentionPolicy(c *gin.Context) (oss.RetentionPolicy, error) {
+	if s := c.PostForm("retention_days"); s != "" {
+		val, err := strconv.Atoi(s)
+		if err != nil {
+			return oss.RetentionPolicy{}, fmt.Errorf("invalid retention_days")
+		}
+		if err := oss.ValidateRetentionDays(val, config.MaxRetentionDays); err != nil {
+			return oss.RetentionPolicy{}, err
+		}
+		if !config.IsAllowedRetentionDays(val) {
+			return oss.RetentionPolicy{}, fmt.Errorf("retention_days %d 不在允许列表 %v 中", val, config.AllowedRetentionDays())
+		}
+		return oss.RetentionDays(val), nil
+	}
+
+	years := config.DefaultRetentionYears()
+	if s := c.PostForm("retention_years"); s != "" {
+		val, err := strconv.Atoi(s)
+		if err != nil {
+			return oss.RetentionPolicy{}, fmt.Errorf("invalid retention_years")
+		}
+		years = val
+	}
+	if err := oss.ValidateRetentionYears(years, config.MaxRetentionYears); err != nil {
+		return oss.RetentionPolicy{}, err
+	}
+	if !config.IsAllowedRetentionYears(years) {
+		return oss.RetentionPolicy{}, fmt.Errorf("retention_years %d 不在允许列表 %v 中", years, config.AllowedRetentionYears())
+	}
+	return oss.RetentionYears(years), nil
 }
 
 // listFiles 获取 OSS 上的文件列表并以 JSON 格式返回
@@ -262,15 +309,38 @@ func getFileInfo(c *gin.Context) {
 
 	log.Printf("[INFO] 成功获取文件信息，文件名: %s，大小: %d", obj.Key, obj.Size)
 	publicKey := stripPrefix(obj.Key)
-	c.JSON(http.StatusOK, gin.H{
-		"id":         publicKey,
-		"object":     "file",
-		"bytes":      obj.Size,
-		"created_at": obj.LastModified.Unix(),
-		"filename":   publicKey,
-		"purpose":    "assistants", // mock
-		"view_url":   signedURL,
-	})
+
+	retentionYears := config.DefaultRetentionYears()
+	retentionDays := 0
+	if p, ok, tagErr := ossClient.GetObjectRetentionPolicy(stripPrefix(fileID)); tagErr == nil && ok {
+		if p.Unit == oss.RetentionUnitDays {
+			retentionDays = p.Value
+		} else {
+			retentionYears = p.Value
+		}
+	}
+
+	until := oss.CalcRetentionUntil(obj.LastModified, retentionYears)
+	if retentionDays > 0 {
+		until = oss.RetentionDays(retentionDays).Until(obj.LastModified)
+	}
+
+	resp := gin.H{
+		"id":              publicKey,
+		"object":          "file",
+		"bytes":           obj.Size,
+		"created_at":      obj.LastModified.Unix(),
+		"filename":        publicKey,
+		"purpose":         "assistants",
+		"retention_until": until.Format(time.RFC3339),
+		"view_url":        signedURL,
+	}
+	if retentionDays > 0 {
+		resp["retention_days"] = retentionDays
+	} else {
+		resp["retention_years"] = retentionYears
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // deleteFile 处理文件删除请求

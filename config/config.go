@@ -25,11 +25,14 @@ type DashScopeConfig struct {
 
 // OSSConfig 定义了阿里云 OSS 的相关配置
 type OSSConfig struct {
-	Endpoint        string `mapstructure:"endpoint"`
-	AccessKeyID     string `mapstructure:"access_key_id"`
-	AccessKeySecret string `mapstructure:"access_key_secret"`
-	BucketName      string `mapstructure:"bucket_name"`
-	BucketPrefix    string `mapstructure:"bucket_prefix"`
+	Endpoint              string `mapstructure:"endpoint"`
+	AccessKeyID           string `mapstructure:"access_key_id"`
+	AccessKeySecret       string `mapstructure:"access_key_secret"`
+	BucketName            string `mapstructure:"bucket_name"`
+	BucketPrefix          string `mapstructure:"bucket_prefix"`
+	DefaultRetentionYears int    `mapstructure:"default_retention_years"`
+	AllowedRetentionYears []int  `mapstructure:"allowed_retention_years"`
+	AllowedRetentionDays  []int  `mapstructure:"allowed_retention_days"`
 }
 
 // ServerConfig 定义了 HTTP 服务的相关配置
@@ -68,6 +71,7 @@ func LoadConfig(cfgFile string) error {
 	viper.BindEnv("oss.access_key_secret", "OSS_ACCESS_KEY_SECRET")
 	viper.BindEnv("oss.bucket_name", "OSS_BUCKET")
 	viper.BindEnv("oss.bucket_prefix", "OSS_BUCKET_PREFIX")
+	viper.BindEnv("oss.default_retention_years", "OSS_DEFAULT_RETENTION_YEARS")
 	viper.BindEnv("dashscope.api_key", "AL_KEY")
 
 	if err := viper.ReadInConfig(); err != nil {

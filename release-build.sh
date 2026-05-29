@@ -32,6 +32,11 @@ oss:
   bucket_name: "your-bucket-name"
   bucket_prefix: ""
 
+  # 可选：默认保存周期（年），省略则 2
+  # default_retention_years: 2
+  # allowed_retention_years: [2, 3, 5, 10]
+  # allowed_retention_days: [1]
+
 server:
   port: 8080
   link_expire_seconds: 3600

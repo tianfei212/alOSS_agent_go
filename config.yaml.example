@@ -4,6 +4,8 @@ oss:
   access_key_secret: "your_access_key_secret"
   bucket_name: "your-bucket-name"
   bucket_prefix: ""
+  # default_retention_years: 2
+  # allowed_retention_years: [2, 3, 5, 10]
 
 server:
   port: 8080

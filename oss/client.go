@@ -120,14 +120,14 @@ func (c *Client) resolveKey(key string) string {
 	return key
 }
 
-// UploadFile 执行本地文件的多部分并发上传至 OSS
-func (c *Client) UploadFile(localFilePath string, objectKey string) error {
+// UploadFile 执行本地文件的多部分并发上传至 OSS，并设置保存周期标签。
+func (c *Client) UploadFile(localFilePath string, objectKey string, policy RetentionPolicy) error {
 	if objectKey == "" {
 		objectKey = "file-" + uuid.New().String() + path.Ext(localFilePath)
 	}
 
 	finalKey := c.resolveKey(objectKey)
-	log.Printf("[INFO] 开始上传本地文件: %s 到 OSS: %s", localFilePath, finalKey)
+	log.Printf("[INFO] 开始上传本地文件: %s 到 OSS: %s，保存周期: %s", localFilePath, finalKey, policy.String())
 
 	fileInfo, err := os.Stat(localFilePath)
 	if err != nil {
@@ -136,6 +136,9 @@ func (c *Client) UploadFile(localFilePath string, objectKey string) error {
 		if err != nil {
 			log.Printf("[ERROR] 本地文件上传失败 (localPath: %s, key: %s): %v\n", localFilePath, finalKey, err)
 			return fmt.Errorf("本地文件上传失败: %w", err)
+		}
+		if err := c.Bucket.PutObjectTagging(finalKey, policy.Tagging()); err != nil {
+			return fmt.Errorf("设置保存周期标签失败: %w", err)
 		}
 		log.Printf("[INFO] 文件上传成功: %s", finalKey)
 		return nil
@@ -170,14 +173,18 @@ func (c *Client) UploadFile(localFilePath string, objectKey string) error {
 		return fmt.Errorf("本地文件上传失败: %w", err)
 	}
 
+	if err := c.Bucket.PutObjectTagging(finalKey, policy.Tagging()); err != nil {
+		return fmt.Errorf("设置保存周期标签失败: %w", err)
+	}
+
 	log.Printf("[INFO] 文件上传成功: %s", finalKey)
 	return nil
 }
 
-// UploadStream 执行流式上传，主要用于处理 HTTP 请求的文件流，并实时打印进度
-func (c *Client) UploadStream(reader io.Reader, objectKey string) error {
+// UploadStream 执行流式上传，主要用于处理 HTTP 请求的文件流，并实时打印进度。
+func (c *Client) UploadStream(reader io.Reader, objectKey string, policy RetentionPolicy) error {
 	finalKey := c.resolveKey(objectKey)
-	log.Printf("[INFO] 开始流式上传到 OSS: %s", finalKey)
+	log.Printf("[INFO] 开始流式上传到 OSS: %s，保存周期: %s", finalKey, policy.String())
 
 	progressReader := &ProgressReader{
 		reader:      reader,
@@ -187,7 +194,7 @@ func (c *Client) UploadStream(reader io.Reader, objectKey string) error {
 	}
 	progressReader.startLogging()
 
-	err := c.Bucket.PutObject(finalKey, progressReader)
+	err := c.Bucket.PutObject(finalKey, progressReader, oss.SetTagging(policy.Tagging()))
 	progressReader.stop()
 
 	if err != nil {
