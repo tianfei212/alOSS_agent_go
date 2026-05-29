@@ -80,6 +80,9 @@ func RunServer() error {
 		v1.GET("/files/:file_id/content", getFileContent)
 	}
 
+	// F5 百炼临时上传（独立鉴权，使用 AL_KEY）
+	registerDashScopeRoutes(r)
+
 	// 增加专用于展示视频或图片的页面接口
 	r.GET("/view/*file_id", viewMedia)
 

@@ -7,15 +7,23 @@
 
 # Build outputs
 build/
+release/
 oss-cli
+oss-cli-test-bin
 oss-server
 
 # Runtime data
 blacklist.txt
 .blackIP.json
+.oss-cli.pid
+logs/
 
 # Large local test assets
 test_file/
 
 # Temp helpers
 patcher.py
+
+# Generated test reports
+docs/TEST-REPORT*.md
+testdata/test-keep-*.png

@@ -10,8 +10,17 @@ import (
 
 // Config 定义了整个应用的配置结构
 type Config struct {
-	OSS    OSSConfig    `mapstructure:"oss"`
-	Server ServerConfig `mapstructure:"server"`
+	OSS       OSSConfig       `mapstructure:"oss"`
+	Server    ServerConfig    `mapstructure:"server"`
+	DashScope DashScopeConfig `mapstructure:"dashscope"`
+}
+
+// DashScopeConfig 定义百炼临时文件上传（F5）相关配置。
+// 上游凭证来自 .env.local 的 AL_KEY，与 OSS、OPENAI_API_KEY 完全隔离。
+type DashScopeConfig struct {
+	APIKey       string `mapstructure:"api_key"`
+	BaseURL      string `mapstructure:"base_url"`
+	DefaultModel string `mapstructure:"default_model"`
 }
 
 // OSSConfig 定义了阿里云 OSS 的相关配置
@@ -59,6 +68,7 @@ func LoadConfig(cfgFile string) error {
 	viper.BindEnv("oss.access_key_secret", "OSS_ACCESS_KEY_SECRET")
 	viper.BindEnv("oss.bucket_name", "OSS_BUCKET")
 	viper.BindEnv("oss.bucket_prefix", "OSS_BUCKET_PREFIX")
+	viper.BindEnv("dashscope.api_key", "AL_KEY")
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("[ERROR] 读取配置文件失败: %v\n", err)
@@ -71,5 +81,13 @@ func LoadConfig(cfgFile string) error {
 	}
 
 	log.Println("[INFO] 配置加载成功")
+	return nil
+}
+
+// ValidateDashScopeKey 校验 F5 百炼功能所需的 AL_KEY 是否已配置。
+func ValidateDashScopeKey() error {
+	if AppConfig.DashScope.APIKey == "" {
+		return fmt.Errorf("未配置 AL_KEY，请在 .env.local 中设置客户百炼 API Key")
+	}
 	return nil
 }

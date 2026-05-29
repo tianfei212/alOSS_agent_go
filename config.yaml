@@ -3,7 +3,14 @@ oss:
   access_key_id: "your_access_key_id"
   access_key_secret: "your_access_key_secret"
   bucket_name: "your-bucket-name"
+  bucket_prefix: ""
 
 server:
   port: 8080
   link_expire_seconds: 3600
+  openai_api_key: "your_api_key"
+
+# F5 百炼临时文件上传（与 OSS 无关，凭证见 .env.local 的 AL_KEY）
+dashscope:
+  base_url: "https://dashscope.aliyuncs.com"
+  default_model: ""
