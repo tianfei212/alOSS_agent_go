@@ -1,3 +1,42 @@
+2026-05-29 23:45:00 +0800
+
+修改模型：GPT-5.5（Cursor Agent 模式，005-go-backend-expert + 012-code-reviewer）
+
+修改目的：**补救 V1.0.5 配置模板遗漏**——补全 `config.yaml.example` 与 `release-build.sh` 中的保存周期配置项，并在 CHANGELOG 记录过程性错误，防止同类问题再次发生。
+
+**过程性错误（V1.0.5 首次提交 `b90e80f`）**：
+
+| 项 | 应有做法 | 实际疏漏 |
+|----|----------|----------|
+| 需求约定 | `config.yaml` 增加 `default_retention_years` 等可选项 | 只实现了 Go 代码与 `config/config.go` 字段，**未在可提交的配置模板中写入显式示例值** |
+| `config.yaml.example` | 与 PRD 一致，写出 `default_retention_years: 2` 等 | 仅加了**注释行**（`# default_retention_years: 2`），运维/用户复制后看不到完整配置结构 |
+| `release-build.sh` 内嵌模板 | 与 `config.yaml.example` 保持同步 | 同样只有注释，release 包内 config 缺字段 |
+| 本地 `config.yaml` | 部署前更新（gitignore，不提交） | 合并推送后**未同步更新**本地 config，用户发现「约点未落地」 |
+
+**根因**：实现功能时以代码路径为验收标准，**未将「配置模板三件套」纳入同一 PR 检查清单**（`config.yaml.example` ↔ `release-build.sh` ↔ README 配置说明）。
+
+**补救**：
+- `config.yaml.example`：写入显式 `default_retention_years: 2`、`allowed_retention_years: [2, 3, 5, 10]`、`allowed_retention_days: [1]`
+- `release-build.sh`：release 包内 config 模板与 example **字段对齐**
+- 代码层向下兼容不变：缺字段仍 fallback 默认 2 年（见 `config/retention.go`）
+
+**防再犯检查清单（新增配置项时必须逐项勾选）**：
+
+1. [ ] `config/config.go` 结构体 + viper/mapstructure
+2. [ ] `config.yaml.example` **显式示例值**（禁止仅注释占位）
+3. [ ] `release-build.sh` 内嵌 config 与 example **同步**
+4. [ ] README 配置段说明（若面向用户）
+5. [ ] CHANGELOG 改动文件列表含上述路径
+6. [ ] 提醒更新本地 `config.yaml`（gitignore，不提交）
+
+改动文件：
+
+- config.yaml.example
+- release-build.sh
+- CHANGELOG.md
+
+---
+
 2026-05-29 23:40:00 +0800
 
 修改模型：GPT-5.5（Cursor Agent 模式，005-go-backend-expert + 012-code-reviewer）
