@@ -23,8 +23,25 @@ chmod +x "${RELEASE_DIR}/${APP_NAME}"
 echo "    大小: $(du -h "${RELEASE_DIR}/${APP_NAME}" | cut -f1)"
 
 echo ""
-echo "[2/4] 复制 config.yaml..."
-cp config.yaml "${RELEASE_DIR}/config.yaml"
+echo "[2/4] 生成 config.yaml 模板（不含真实凭证）..."
+cat > "${RELEASE_DIR}/config.yaml" << 'CFGEOF'
+oss:
+  endpoint: "oss-cn-hangzhou.aliyuncs.com"
+  access_key_id: "your_access_key_id"
+  access_key_secret: "your_access_key_secret"
+  bucket_name: "your-bucket-name"
+  bucket_prefix: ""
+
+server:
+  port: 8080
+  link_expire_seconds: 3600
+  openai_api_key: "your_api_key"
+
+# F5 百炼临时文件上传（与 OSS 无关，凭证见 .env.local 的 AL_KEY）
+dashscope:
+  base_url: "https://dashscope.aliyuncs.com"
+  default_model: ""
+CFGEOF
 
 echo ""
 echo "[3/4] 生成 .env.local 模板..."
