@@ -39,6 +39,14 @@
 
 程序默认会先读取 `.env.local`，再读取 `config.yaml`。
 
+**这两个文件均含敏感信息，不得提交到 git。** 首次使用请复制模板：
+
+```bash
+cp config.yaml.example config.yaml
+cp .env.example .env.local
+# 编辑 config.yaml 与 .env.local 填入真实凭证
+```
+
 推荐保留 `.env.local` 作为敏感配置文件，不要提交到 git。
 
 ### `.env.local` 示例

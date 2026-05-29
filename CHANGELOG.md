@@ -1,3 +1,27 @@
+2026-05-29 23:30:00 +0800
+
+修改模型：GPT-5.5（Cursor Agent 模式，012-code-reviewer）
+
+修改目的：安全加固——从远程仓库移除 `config.yaml`（曾含或可含真实凭证），确保 `.env.local` 不被跟踪；新增 `config.yaml.example` 占位模板供本地复制使用。
+
+**问题**：`config.yaml` 被 git 跟踪并推送至远程，存在凭证泄露风险；`.env.local` 虽已在 .gitignore，需与 config 一并明确禁止提交。
+
+**方案**：
+- `git rm --cached config.yaml`，本地文件保留
+- `.gitignore` 增加 `config.yaml`
+- 新增 `config.yaml.example`（占位符，可提交）
+- README 说明 `cp config.yaml.example config.yaml`
+
+改动文件：
+
+- .gitignore
+- config.yaml（从 git 索引删除，远程不再存在）
+- config.yaml.example（新建）
+- README.md
+- CHANGELOG.md
+
+---
+
 2026-05-29 23:10:00 +0800
 
 修改模型：GPT-5.5（Cursor Agent 模式，012-code-reviewer）

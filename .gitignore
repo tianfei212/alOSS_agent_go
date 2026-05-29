@@ -4,6 +4,7 @@
 
 # Secrets and local env
 .env.local
+config.yaml
 
 # Build outputs
 build/
