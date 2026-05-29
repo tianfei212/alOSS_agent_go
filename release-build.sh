@@ -1,5 +1,6 @@
 #!/bin/bash
-# 构建 release 包：release/{时间}_{版本}/ 目录下包含二进制、config.yaml、.env.local
+# 构建 release 包：release/{时间}_{版本}/ 下含 linux-amd64 / darwin-arm64 二进制与压缩包
+# 不含真实 config.yaml、.env.local，仅附带 *.example 模板
 
 set -euo pipefail
 
@@ -7,6 +8,10 @@ APP_NAME="oss-cli"
 VERSION=$(cat VERSION 2>/dev/null || echo "V1.0.0")
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RELEASE_DIR="release/${TIMESTAMP}_${VERSION}"
+BUILD_TARGETS=(
+  "linux-amd64"
+  "darwin-arm64"
+)
 
 echo "============================================"
 echo "  ${APP_NAME} Release 构建"
@@ -16,55 +21,48 @@ echo "============================================"
 
 mkdir -p "${RELEASE_DIR}"
 
-echo ""
-echo "[1/4] 编译 Linux amd64 二进制..."
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "${RELEASE_DIR}/${APP_NAME}" .
-chmod +x "${RELEASE_DIR}/${APP_NAME}"
-echo "    大小: $(du -h "${RELEASE_DIR}/${APP_NAME}" | cut -f1)"
+for target in "${BUILD_TARGETS[@]}"; do
+  GOOS="${target%-*}"
+  GOARCH="${target#*-}"
+  PLATFORM_DIR="${RELEASE_DIR}/${target}"
 
-echo ""
-echo "[2/4] 生成 config.yaml 模板（不含真实凭证）..."
-cat > "${RELEASE_DIR}/config.yaml" << 'CFGEOF'
-oss:
-  endpoint: "oss-cn-hangzhou.aliyuncs.com"
-  access_key_id: "your_access_key_id"
-  access_key_secret: "your_access_key_secret"
-  bucket_name: "your-bucket-name"
-  bucket_prefix: ""
-  default_retention_years: 2
-  allowed_retention_years: [2, 3, 5, 10]
-  allowed_retention_days: [1]
+  echo ""
+  echo ">>> [${target}] 编译 ${GOOS}/${GOARCH}..."
+  mkdir -p "${PLATFORM_DIR}"
+  CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build -o "${PLATFORM_DIR}/${APP_NAME}" .
+  chmod +x "${PLATFORM_DIR}/${APP_NAME}"
+  echo "    大小: $(du -h "${PLATFORM_DIR}/${APP_NAME}" | cut -f1)"
 
-server:
-  port: 8080
-  link_expire_seconds: 3600
-  openai_api_key: "your_api_key"
+  echo ">>> [${target}] 复制模板与脚本（不含 config.yaml / .env.local）..."
+  cp config.yaml.example "${PLATFORM_DIR}/config.yaml.example"
+  cp .env.example "${PLATFORM_DIR}/.env.example"
+  cp oss-cli.sh "${PLATFORM_DIR}/oss-cli.sh"
+  chmod +x "${PLATFORM_DIR}/oss-cli.sh"
 
-# F5 百炼临时文件上传（与 OSS 无关，凭证见 .env.local 的 AL_KEY）
-dashscope:
-  base_url: "https://dashscope.aliyuncs.com"
-  default_model: ""
-CFGEOF
+  cat > "${PLATFORM_DIR}/README-RELEASE.txt" << 'READMEEOF'
+部署说明
+========
 
-echo ""
-echo "[3/4] 生成 .env.local 模板..."
-cat > "${RELEASE_DIR}/.env.local" << 'ENVEOF'
-# F1-F4 自有 OSS / OpenAI Files API
-OPENAI_API_KEY=
-OSS_ENDPOINT=
-OSS_BUCKET=
-OSS_BUCKET_PREFIX=
-OSS_ACCESS_KEY_ID=
-OSS_ACCESS_KEY_SECRET=
+1. 复制配置模板并填写真实凭证：
+   cp config.yaml.example config.yaml
+   cp .env.example .env.local
 
-# F5 百炼临时文件上传（与 OSS、OPENAI_API_KEY 无关，必填才能使用 dashscope 功能）
-AL_KEY=
-ENVEOF
+2. 启动服务：
+   ./oss-cli.sh start
 
-echo ""
-echo "[4/4] 生成 oss-cli.sh 服务管理脚本..."
-cp oss-cli.sh "${RELEASE_DIR}/oss-cli.sh"
-chmod +x "${RELEASE_DIR}/oss-cli.sh"
+本 release 包 intentionally 不包含 config.yaml 与 .env.local，避免泄露密钥。
+READMEEOF
+
+  if [ -f "${PLATFORM_DIR}/config.yaml" ] || [ -f "${PLATFORM_DIR}/.env.local" ]; then
+    echo "错误: release 包中不得包含 config.yaml 或 .env.local"
+    exit 1
+  fi
+
+  PKG_NAME="${APP_NAME}-${target}-${VERSION}.tar.gz"
+  echo ">>> [${target}] 打包 ${PKG_NAME}..."
+  tar -czf "${RELEASE_DIR}/${PKG_NAME}" -C "${RELEASE_DIR}" "${target}"
+  echo "    大小: $(du -h "${RELEASE_DIR}/${PKG_NAME}" | cut -f1)"
+done
 
 echo ""
 echo "============================================"
