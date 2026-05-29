@@ -103,6 +103,8 @@ go build -o oss-cli .
 ```bash
 ./oss-cli url your-file.jpg
 ./oss-cli url your-file.jpg -e 7200
+./oss-cli url your-file.jpg --format webp
+./oss-cli thumbnail your-file.jpg --format webp
 ```
 
 ### 删除文件
@@ -207,6 +209,21 @@ Authorization: Bearer <OPENAI_API_KEY>
 ### 6. 获取媒体预览 JSON
 
 `GET /view/{file_id}`
+
+Query 参数：
+
+| 参数 | 说明 |
+|------|------|
+| `w` / `h` | 缩略图宽高（须同时有效且 > 0） |
+| `format=webp` | 输出 WebP 格式（可与 w/h 组合） |
+| `expire_seconds` | 签名 URL 有效期（秒） |
+
+示例：
+
+```http
+GET /view/photo.jpg?format=webp
+GET /view/photo.jpg?w=400&h=300&format=webp
+```
 
 返回：
 

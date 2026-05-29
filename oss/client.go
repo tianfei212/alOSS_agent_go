@@ -219,17 +219,28 @@ func (c *Client) DeleteFile(objectKey string) error {
 
 // ListFiles 列出 OSS 中的文件列表
 func (c *Client) ListFiles(prefix string, maxKeys int) ([]oss.ObjectProperties, error) {
+	objects, _, err := c.ListFilesPage(prefix, maxKeys, "")
+	return objects, err
+}
+
+// ListFilesPage 分页列出 OSS 文件，返回下一页 continuation token（空表示无更多）。
+func (c *Client) ListFilesPage(prefix string, maxKeys int, continuationToken string) ([]oss.ObjectProperties, string, error) {
 	finalPrefix := c.resolveKey(prefix)
 	log.Printf("[INFO] 列出 OSS 文件，前缀: %s，最大数量: %d", finalPrefix, maxKeys)
 
-	lsRes, err := c.Bucket.ListObjectsV2(oss.Prefix(finalPrefix), oss.MaxKeys(maxKeys))
+	opts := []oss.Option{oss.Prefix(finalPrefix), oss.MaxKeys(maxKeys)}
+	if continuationToken != "" {
+		opts = append(opts, oss.ContinuationToken(continuationToken))
+	}
+
+	lsRes, err := c.Bucket.ListObjectsV2(opts...)
 	if err != nil {
 		log.Printf("[ERROR] 列出文件失败 (prefix: %s): %v\n", finalPrefix, err)
-		return nil, fmt.Errorf("列出文件失败: %w", err)
+		return nil, "", fmt.Errorf("列出文件失败: %w", err)
 	}
 
 	log.Printf("[INFO] 成功列出 %d 个文件", len(lsRes.Objects))
-	return lsRes.Objects, nil
+	return lsRes.Objects, lsRes.NextContinuationToken, nil
 }
 
 // GetSignedURL 生成带有有效期的临时下载/播放链接
@@ -247,21 +258,29 @@ func (c *Client) GetSignedURL(objectKey string, expiredInSec int) (string, error
 	return signedURL, nil
 }
 
-// GetThumbnailSignedURL 生成带有有效期的缩略图临时访问链接
-// width 参数指定缩略图宽度（单位：像素），高度按原图比例自动计算
-func (c *Client) GetThumbnailSignedURL(objectKey string, width int, height int, expiredInSec int) (string, error) {
-	finalKey := c.resolveKey(objectKey)
-	log.Printf("[INFO] 生成缩略图签名 URL，文件: %s，宽度: %dpx，高度: %dpx，有效期: %d 秒", finalKey, width, height, expiredInSec)
-
-	process := fmt.Sprintf("image/resize,w_%d,h_%d,m_fill", width, height)
-	signedURL, err := c.Bucket.SignURL(finalKey, oss.HTTPGet, int64(expiredInSec), oss.Process(process))
-	if err != nil {
-		log.Printf("[ERROR] 生成缩略图签名 URL 失败 (key: %s, width: %d, height: %d): %v\n", finalKey, width, height, err)
-		return "", fmt.Errorf("生成缩略图签名 URL 失败: %w", err)
+// GetViewSignedURL 生成预览签名 URL，可选缩略图（width/height 均 > 0）与 format=webp 转换。
+func (c *Client) GetViewSignedURL(objectKey string, width, height int, format string, expiredInSec int) (string, error) {
+	process := BuildImageProcess(width, height, format)
+	if process == "" {
+		return c.GetSignedURL(objectKey, expiredInSec)
 	}
 
-	log.Printf("[INFO] 缩略图签名 URL 生成成功")
+	finalKey := c.resolveKey(objectKey)
+	log.Printf("[INFO] 生成图片处理签名 URL，文件: %s，process: %s，有效期: %d 秒", finalKey, process, expiredInSec)
+
+	signedURL, err := c.Bucket.SignURL(finalKey, oss.HTTPGet, int64(expiredInSec), oss.Process(process))
+	if err != nil {
+		log.Printf("[ERROR] 生成图片处理签名 URL 失败 (key: %s, process: %s): %v\n", finalKey, process, err)
+		return "", fmt.Errorf("生成图片处理签名 URL 失败: %w", err)
+	}
+
+	log.Printf("[INFO] 图片处理签名 URL 生成成功")
 	return signedURL, nil
+}
+
+// GetThumbnailSignedURL 生成带有有效期的缩略图临时访问链接（固定宽高 m_fill 裁剪）。
+func (c *Client) GetThumbnailSignedURL(objectKey string, width int, height int, expiredInSec int) (string, error) {
+	return c.GetViewSignedURL(objectKey, width, height, "", expiredInSec)
 }
 
 // GetFileInfo 获取 OSS 中对象的文件元数据

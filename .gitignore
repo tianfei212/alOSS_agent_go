@@ -27,3 +27,4 @@ patcher.py
 # Generated test reports
 docs/TEST-REPORT*.md
 testdata/test-keep-*.png
+downloads/

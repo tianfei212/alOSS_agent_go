@@ -12,7 +12,7 @@ import (
 )
 
 var cfgFile string
-var appVersion = "V1.0.3"
+var appVersion = "V1.0.4"
 
 // rootCmd 是整个 CLI 应用程序的基础命令
 var rootCmd = &cobra.Command{

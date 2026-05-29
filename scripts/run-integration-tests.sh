@@ -30,8 +30,8 @@ else
 fi
 
 CLI_BIN="${CLI_BIN:-${ROOT_DIR}/oss-cli-test-bin}"
-if [ ! -x "${CLI_BIN}" ]; then
-  go build -o "${CLI_BIN}" . 2>/dev/null
+if [ ! -x "${CLI_BIN}" ] || [ main.go -nt "${CLI_BIN}" ] || find cmd oss server -name '*.go' -newer "${CLI_BIN}" 2>/dev/null | grep -q .; then
+  go build -o "${CLI_BIN}" .
 fi
 
 PASS=0
@@ -228,6 +228,57 @@ else
   record "HTTP" "H5" "/view 签名地址获取" "SKIP" "依赖 H3 上传结果"
 fi
 
+# H5b: /view format=webp
+if [ -n "${HTTP_OSS_ID:-}" ]; then
+  CODE=$(http_code "${BASE_URL}/view/${HTTP_OSS_ID}?format=webp")
+  if [ "${CODE}" = "200" ] && grep -q '"output_format"' /tmp/oss_test_body.json 2>/dev/null; then
+    WEBP_URL=$(python3 -c "import json; print(json.load(open('/tmp/oss_test_body.json')).get('url',''))" 2>/dev/null)
+    if echo "${WEBP_URL}" | grep -qi 'x-oss-process'; then
+      record "HTTP" "H5b" "/view format=webp" "PASS" "output_format=webp，url 含 x-oss-process"
+    else
+      record "HTTP" "H5b" "/view format=webp" "FAIL" "url 缺少 x-oss-process"
+    fi
+  else
+    record "HTTP" "H5b" "/view format=webp" "FAIL" "HTTP ${CODE}"
+  fi
+else
+  record "HTTP" "H5b" "/view format=webp" "SKIP" "依赖 H3 上传结果"
+fi
+
+# H5c: /view w+h+format=webp
+if [ -n "${HTTP_OSS_ID:-}" ]; then
+  CODE=$(http_code "${BASE_URL}/view/${HTTP_OSS_ID}?w=100&h=80&format=webp")
+  if [ "${CODE}" = "200" ] && grep -q '"output_format"' /tmp/oss_test_body.json 2>/dev/null; then
+    WEBP_THUMB_URL=$(python3 -c "import json; print(json.load(open('/tmp/oss_test_body.json')).get('url',''))" 2>/dev/null)
+    if echo "${WEBP_THUMB_URL}" | grep -qi 'resize' && echo "${WEBP_THUMB_URL}" | grep -qi 'webp'; then
+      record "HTTP" "H5c" "/view 缩略图+webp" "PASS" "url 含 resize 与 webp process"
+    else
+      record "HTTP" "H5c" "/view 缩略图+webp" "FAIL" "url process 不完整"
+    fi
+  else
+    record "HTTP" "H5c" "/view 缩略图+webp" "FAIL" "HTTP ${CODE}"
+  fi
+else
+  record "HTTP" "H5c" "/view 缩略图+webp" "SKIP" "依赖 H3 上传结果"
+fi
+
+# H5d: /view 回归（无 format，不含 x-oss-process）
+if [ -n "${HTTP_OSS_ID:-}" ]; then
+  CODE=$(http_code "${BASE_URL}/view/${HTTP_OSS_ID}")
+  if [ "${CODE}" = "200" ]; then
+    PLAIN_URL=$(python3 -c "import json; print(json.load(open('/tmp/oss_test_body.json')).get('url',''))" 2>/dev/null)
+    if echo "${PLAIN_URL}" | grep -qi 'x-oss-process'; then
+      record "HTTP" "H5d" "/view 无 format 回归" "FAIL" "原图 url 不应含 x-oss-process"
+    else
+      record "HTTP" "H5d" "/view 无 format 回归" "PASS" "原图 url 无 process 参数"
+    fi
+  else
+    record "HTTP" "H5d" "/view 无 format 回归" "FAIL" "HTTP ${CODE}"
+  fi
+else
+  record "HTTP" "H5d" "/view 无 format 回归" "SKIP" "依赖 H3 上传结果"
+fi
+
 # H6: 文件是否存在（GET /v1/files/:id）
 if [ -n "${HTTP_OSS_ID:-}" ]; then
   CODE=$(http_code -H "Authorization: Bearer ${OPENAI_KEY}" \
@@ -355,6 +406,23 @@ if [ -n "${CLI_OSS_KEY:-}" ]; then
   fi
 else
   record "CLI" "C4" "OSS 签名地址获取" "SKIP" "依赖 C3"
+fi
+
+# C4b: OSS WebP 签名 URL
+if [ -n "${CLI_OSS_KEY:-}" ]; then
+  PUBLIC_KEY="${CLI_OSS_KEY#video_T/}"
+  if OUT=$("${CLI_BIN}" --config "${CONFIG_FILE}" url "${PUBLIC_KEY}" --format webp -e 3600 2>&1); then
+    CLI_WEBP_SIGNED=$(echo "${OUT}" | grep -E '^https://' | head -1)
+    if [ -n "${CLI_WEBP_SIGNED}" ] && echo "${CLI_WEBP_SIGNED}" | grep -qi 'x-oss-process'; then
+      record "CLI" "C4b" "OSS WebP 签名地址" "PASS" "url 含 x-oss-process"
+    else
+      record "CLI" "C4b" "OSS WebP 签名地址" "FAIL" "无有效 webp process url"
+    fi
+  else
+    record "CLI" "C4b" "OSS WebP 签名地址" "FAIL" "$(echo "${OUT}" | tail -1)"
+  fi
+else
+  record "CLI" "C4b" "OSS WebP 签名地址" "SKIP" "依赖 C3"
 fi
 
 # C5: 文件列表（按前缀过滤测试文件）

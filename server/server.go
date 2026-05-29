@@ -324,13 +324,14 @@ func getFileContent(c *gin.Context) {
 }
 
 // viewMedia 返回 OSS 签名 URL（JSON 格式），供前端直接播放/展示，无需鉴权
-// 支持 query 参数 w（宽度）和 h（高度）生成缩略图
+// 支持 query 参数 w（宽度）、h（高度）生成缩略图，format=webp 输出 WebP 格式
 func viewMedia(c *gin.Context) {
 	fileID := strings.TrimPrefix(c.Param("file_id"), "/")
 	expireSecStr := c.Query("expire_seconds")
 	widthStr := c.Query("w")
 	heightStr := c.Query("h")
-	log.Printf("[INFO] 收到媒体预览请求，文件ID: %s，宽度: %spx，高度: %spx", fileID, widthStr, heightStr)
+	formatStr := c.Query("format")
+	log.Printf("[INFO] 收到媒体预览请求，文件ID: %s，宽度: %spx，高度: %spx，format: %s", fileID, widthStr, heightStr, formatStr)
 
 	expireSec := config.AppConfig.Server.LinkExpireSeconds
 	if expireSec == 0 {
@@ -351,24 +352,32 @@ func viewMedia(c *gin.Context) {
 		return
 	}
 
-	var signedURL string
 	width, wErr := strconv.Atoi(widthStr)
 	height, hErr := strconv.Atoi(heightStr)
-	if wErr == nil && hErr == nil && width > 0 && height > 0 {
-		signedURL, err = ossClient.GetThumbnailSignedURL(stripPrefix(fileID), width, height, expireSec)
-		if err != nil {
-			log.Printf("[ERROR] 生成缩略图签名链接失败: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+	if wErr != nil || hErr != nil || width <= 0 || height <= 0 {
+		width, height = 0, 0
+	}
+
+	effectiveFormat := ""
+	if strings.EqualFold(formatStr, "webp") {
+		if oss.IsImageKey(fileID) {
+			effectiveFormat = "webp"
+		} else {
+			log.Printf("[WARN] format=webp 已忽略，非图片文件: %s", fileID)
 		}
+	}
+
+	signedURL, err := ossClient.GetViewSignedURL(stripPrefix(fileID), width, height, effectiveFormat, expireSec)
+	if err != nil {
+		log.Printf("[ERROR] 生成签名链接失败: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if width > 0 && height > 0 {
 		log.Printf("[INFO] 使用缩略图模式，宽度: %dpx，高度: %dpx", width, height)
-	} else {
-		signedURL, err = ossClient.GetSignedURL(stripPrefix(fileID), expireSec)
-		if err != nil {
-			log.Printf("[ERROR] 生成签名链接失败: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+	}
+	if effectiveFormat == "webp" {
+		log.Printf("[INFO] 使用 WebP 格式转换")
 	}
 
 	ext := ""
@@ -392,11 +401,15 @@ func viewMedia(c *gin.Context) {
 	}
 
 	log.Printf("[INFO] 返回媒体预览信息，类型: %s，签名URL有效期: %d秒", mediaType, expireSec)
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"id":         stripPrefix(fileID),
 		"media_type": mediaType,
 		"url":        signedURL,
 		"expires_in": expireSec,
 		"created_at": time.Now().Unix(),
-	})
+	}
+	if effectiveFormat == "webp" {
+		resp["output_format"] = "webp"
+	}
+	c.JSON(http.StatusOK, resp)
 }

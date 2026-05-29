@@ -1,3 +1,40 @@
+2026-05-29 23:10:00 +0800
+
+修改模型：GPT-5.5（Cursor Agent 模式，012-code-reviewer）
+
+修改目的：版本升级至 **V1.0.4**。解决 OSS 标准获取（F3）无法在签名阶段申请 WebP 格式的问题——私有 Bucket 不能在签名 URL 后拼接 `x-oss-process`，必须在 Agent 侧将图片处理参数纳入签名。
+
+**问题**：`GET /view/{file_id}` 仅支持原图签名或 `w`/`h` 缩略图，列表页等场景无法同时获得更小体积的 WebP 输出。
+
+**方案**：
+- 新增 query 参数 `format=webp`，可与 `w`/`h` 组合（process 示例：`image/format,webp`、`image/resize,w_200,h_100,m_fill/format,webp`）
+- OSS 层统一 `BuildImageProcess` + `GetViewSignedURL`，`SignURL(..., oss.Process(...))` 纳入签名
+- 非图片传 `format=webp` 时忽略并 WARN，向后兼容（不传 format 行为不变）
+- 响应在 WebP 生效时增加 `output_format: webp`
+- CLI `url` / `thumbnail` 增加 `--format webp`
+- 集成测试 H5b/H5c/H5d、C4b；批量验证脚本下载 100 张 WebP（100/100 成功）
+
+改动文件：
+
+- VERSION
+- cmd/root.go
+- cmd/url.go
+- oss/image_process.go（新建）
+- oss/image_process_test.go（新建）
+- oss/client.go
+- server/server.go
+- scripts/webp-download-test/main.go（新建）
+- scripts/run-integration-tests.sh
+- docs/PRD-VIEW-WEBP-FORMAT.md（新建）
+- docs/PLAN-VIEW-WEBP-FORMAT.md（新建）
+- docs/TEST-REPORT-WEBP-20260529.md（新建）
+- docs/ARCHITECTURE.md
+- README.md
+- .gitignore
+- CHANGELOG.md
+
+---
+
 2026-05-29 22:30:00 +0800
 
 
